@@ -74,7 +74,7 @@
 
 (defn snake-tail [coordinate-1 coordinate-2]
   "Computes x or y tail coordinate according to the last two values of lat coordinate"
-  (if (= coordinate-1 coordinate-)
+  (if (= coordinate-1 coordinate-2)
     coordinate-1
     (if (> coordinate-1 coordinate-2)
       (dec coordinate-2)
@@ -98,15 +98,30 @@
         (assoc :point (rand-free-position snake board)))
     db))
 
+(defn collisions
+  "Returns true if the snake collision with the board edges or itself (the snake body) is detected"
+  [snake board]
+  (let [{:keys [body direction]} snake
+        [x y] board
+        border-x #{x -1}
+        border-y #{y -1}
+        future-x (+ (first direction) (ffirst body))
+        future-y (+ (second direction) (second (first body)))]
+    (or (contains? border-x future-x)
+        (contains? border-y future-y)
+        (contains? (into #{} (rest body)) [future-x future-y]))))
+
 (register-handler
  :next-state
  (fn
-   [db _]
+   [{:keys [snake board] :as db} _]
    (if (:game-running? db)
-     (-> db
-         (update-in [:snake] move-snake)
-         (as-> after-move
-             (process-move after-move)))
+     (if (collisions snake board)
+       (assoc-in db [:game-running?] false)
+       (-> db
+           (update-in [:snake] move-snake)
+           (as-> after-move
+               (process-move after-move))))
      db)))
 
 (defonce snake-moving
@@ -185,7 +200,7 @@
       (if @game-state
         [:div]
         [:div.overlay
-         [:div.play
+         [:div.play {:on-click #(dispatch [:initialize])}
           [:h1 "↺"]]]))))
 
 (defn game
