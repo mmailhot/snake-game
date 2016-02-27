@@ -62,6 +62,63 @@
    [db _]
    (reaction (:game-running? @db))))
 
+;; ----------------
+;;  Main Game Loop
+;; ----------------
+
+(defn move-snake
+  "Move the whole snake based on positions and directions of each snake body segments"
+  [{:keys [direction body] :as snake}]
+  (let [head-new-position (mapv + direction (first body))]
+    (update-in snake [:body] #(into [] (drop-last (cons head-new-position body))))))
+
+(register-handler
+ :next-state
+ (fn
+   [db _]
+   (if (:game-running? db)
+     (update db :snake move-snake)
+     db)))
+
+(defonce snake-moving
+  (js/setInterval #(dispatch [:next-state]) 150))
+
+;; -------
+;;  Input
+;; -------
+
+(def key-code->move
+  "Mapping from the integer key code to the direction vector for that key"
+  {38 [0 -1]
+   40 [0 1]
+   39 [1 0]
+   37 [-1 0]})
+
+(defn change-snake-direction
+  "Changes the snake head direction, only when it's perpendicular to the old head direction"
+  [[new-x new-y] [x y]]
+  (if (or (= x new-x)
+          (= y new-y))
+    [x y]
+    [new-x new-y]))
+
+(register-handler
+ :change-direction
+ (fn [db [_ new-direction]]
+   (update-in db [:snake :direction]
+              (partial change-snake-direction new-direction))))
+
+(defonce key-handler
+  (events/listen js/window "keydown"
+                 (fn [e]
+                   (let [key-code (.-keyCode e)]
+                     (when (contains? key-code->move key-code)
+                       (dispatch [:change-direction (key-code->move key-code)]))))))
+
+;; -----------
+;;  Rendering
+;; -----------
+
 (defn render-board
   "Renders the game board area"
   []
