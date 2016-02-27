@@ -72,12 +72,41 @@
   (let [head-new-position (mapv + direction (first body))]
     (update-in snake [:body] #(into [] (drop-last (cons head-new-position body))))))
 
+(defn snake-tail [coordinate-1 coordinate-2]
+  "Computes x or y tail coordinate according to the last two values of lat coordinate"
+  (if (= coordinate-1 coordinate-)
+    coordinate-1
+    (if (> coordinate-1 coordinate-2)
+      (dec coordinate-2)
+      (inc coordinate-2))))
+
+(defn grow-snake
+  "Append a new tail body segment to the snake"
+  [{:keys [body direction] :as snake}]
+  (let [[[first-x first-y] [sec-x sec-y]] (take-last 2 body)
+        x (snake-tail first-x sec-x)
+        y (snake-tail first-y sec-y)]
+    (update-in snake [:body] #(conj % [x y]))))
+
+(defn process-move
+  "Evaluates the new snake position in a context of the whole game"
+  [{:keys [snake point board] :as db}]
+  (if (= point (first (:body snake)))
+    (-> db
+        (update-in [:snake] grow-snake)
+        (update-in [:points] inc)
+        (assoc :point (rand-free-position snake board)))
+    db))
+
 (register-handler
  :next-state
  (fn
    [db _]
    (if (:game-running? db)
-     (update db :snake move-snake)
+     (-> db
+         (update-in [:snake] move-snake)
+         (as-> after-move
+             (process-move after-move)))
      db)))
 
 (defonce snake-moving
